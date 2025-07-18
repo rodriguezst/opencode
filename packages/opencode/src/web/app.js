@@ -9,17 +9,39 @@ class OpenCodeWebClient {
         this.selectedModel = null;
         this.selectedMode = null;
         this.eventSource = null;
+        this.theme = localStorage.getItem('theme') || 'dark';
         
         this.init();
     }
     
     async init() {
+        this.initTheme();
         this.bindEvents();
         await this.loadInitialData();
         this.connectToEvents();
     }
     
+    initTheme() {
+        document.documentElement.setAttribute('data-theme', this.theme);
+        this.updateThemeIcon();
+    }
+    
+    toggleTheme() {
+        this.theme = this.theme === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('theme', this.theme);
+        document.documentElement.setAttribute('data-theme', this.theme);
+        this.updateThemeIcon();
+    }
+    
+    updateThemeIcon() {
+        const icon = document.querySelector('.theme-icon');
+        if (icon) {
+            icon.textContent = this.theme === 'dark' ? '☀️' : '🌙';
+        }
+    }
+    
     bindEvents() {
+        document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
         document.getElementById('new-session').addEventListener('click', () => this.createSession());
         document.getElementById('send-btn').addEventListener('click', () => this.sendMessage());
         document.getElementById('message-input').addEventListener('keydown', (e) => {
