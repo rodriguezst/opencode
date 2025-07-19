@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>opencode - Web TUI</title>
+    <link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="header-left">
+                <img src="https://opencode.ai/_astro/logo-ornate-light.BKqu4QZH_19DKCs.svg" alt="opencode" class="logo">
+            </div>
+            <div class="header-right">
+                <button id="theme-toggle" class="theme-toggle" title="Toggle light/dark mode">
+                    <span class="theme-icon">🌙</span>
+                </button>
+                <div class="status" id="status">Connecting...</div>
+            </div>
+        </header>
+        
+        <main class="main">
+            <div class="sidebar">
+                <div class="section">
+                    <h3>Sessions</h3>
+                    <div id="sessions" class="sessions"></div>
+                    <button id="new-session" class="btn">New Session</button>
+                </div>
+                
+                <div class="section">
+                    <h3>Providers</h3>
+                    <div id="providers" class="providers"></div>
+                </div>
+                
+                <div class="section">
+                    <h3>Modes</h3>
+                    <div id="modes" class="modes"></div>
+                </div>
+            </div>
+            
+            <div class="chat-area">
+                <div id="messages" class="messages"></div>
+                <div class="input-area">
+                    <div class="input-controls">
+                        <select id="provider-select" class="select">
+                            <option value="">Select Provider</option>
+                        </select>
+                        <select id="model-select" class="select">
+                            <option value="">Select Model</option>
+                        </select>
+                        <select id="mode-select" class="select">
+                            <option value="">Select Mode</option>
+                        </select>
+                    </div>
+                    <div class="message-input">
+                        <textarea id="message-input" placeholder="Type your message..."></textarea>
+                        <button id="send-btn" class="btn btn-primary">Send</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="/web/app.js"></script>
+</body>
+</html>

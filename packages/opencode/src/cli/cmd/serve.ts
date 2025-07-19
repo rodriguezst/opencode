@@ -19,6 +19,12 @@ export const ServeCommand = cmd({
         type: "string",
         describe: "hostname to listen on",
         default: "127.0.0.1",
+      })
+      .option("web", {
+        alias: ["w"],
+        type: "boolean",
+        describe: "enable web interface",
+        default: false,
       }),
   describe: "starts a headless opencode server",
   handler: async (args) => {
@@ -31,14 +37,19 @@ export const ServeCommand = cmd({
 
       const hostname = args.hostname
       const port = args.port
+      const webEnabled = args.web
 
       await Share.init()
       const server = Server.listen({
         port,
         hostname,
+        webEnabled,
       })
 
       console.log(`opencode server listening on http://${server.hostname}:${server.port}`)
+      if (webEnabled) {
+        console.log(`Web interface available at http://${server.hostname}:${server.port}`)
+      }
 
       await new Promise(() => {})
 

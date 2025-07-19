@@ -17,6 +17,8 @@ import { File } from "../file"
 import { LSP } from "../lsp"
 import { MessageV2 } from "../session/message-v2"
 import { Mode } from "../session/mode"
+import { serveStatic } from "hono/bun"
+import path from "path"
 
 const ERRORS = {
   400: {
@@ -42,8 +44,31 @@ export namespace Server {
 
   export type Routes = ReturnType<typeof app>
 
-  function app() {
+  interface ServerOptions {
+    webEnabled?: boolean
+  }
+
+  function app(options: ServerOptions = {}) {
     const app = new Hono()
+
+    // Add web interface static file serving if enabled
+    if (options.webEnabled) {
+      const webDir = path.resolve(import.meta.dirname, "../web")
+      
+      // Serve static files for the web interface
+      app.use("/web/*", serveStatic({
+        root: webDir,
+        rewriteRequestPath: (path) => path.replace(/^\/web/, "")
+      }))
+      
+      // Serve the main web interface at the root
+      app.get("/", serveStatic({
+        path: "./index.html",
+        root: webDir
+      }))
+      
+      log.info("Web interface enabled", { webDir })
+    }
 
     const result = app
       .onError((err, c) => {
@@ -731,12 +756,12 @@ export namespace Server {
     return result
   }
 
-  export function listen(opts: { port: number; hostname: string }) {
+  export function listen(opts: { port: number; hostname: string; webEnabled?: boolean }) {
     const server = Bun.serve({
       port: opts.port,
       hostname: opts.hostname,
       idleTimeout: 0,
-      fetch: app().fetch,
+      fetch: app({ webEnabled: opts.webEnabled }).fetch,
     })
     return server
   }
