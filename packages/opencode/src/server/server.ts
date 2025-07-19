@@ -53,7 +53,7 @@ export namespace Server {
 
     // Add web interface static file serving if enabled
     if (options.webEnabled) {
-      const webDir = path.resolve(import.meta.dirname, "web")
+      const webDir = path.resolve(import.meta.dirname, "../web")
       
       // Serve static files for the web interface
       app.use("/web/*", serveStatic({
