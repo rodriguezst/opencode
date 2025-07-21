@@ -1,10 +1,10 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import * as SecureStore from 'expo-secure-store';
-import { OpenCodeClient, ServerConfig, AuthStatus, Message as OpenCodeMessage, Provider, Mode } from './src/opencode-client';
+import { OpenCodeClient, type ServerConfig, type AuthStatus, type Provider, type Mode } from './src/opencode-client';
 
 // Types
 interface LocalMessage {
@@ -270,8 +270,6 @@ function ChatScreen({ navigation, route }: any) {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentSession, setCurrentSession] = useState<string | null>(null);
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [modes, setModes] = useState<Mode[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [selectedMode, setSelectedMode] = useState<Mode | null>(null);
   const { client } = route.params;
@@ -288,9 +286,6 @@ function ChatScreen({ navigation, route }: any) {
         client.getModes(),
       ]);
       
-      setProviders(providersResponse.providers);
-      setModes(modesResponse);
-      
       if (providersResponse.providers.length > 0) {
         setSelectedProvider(providersResponse.providers[0]);
       }
@@ -305,7 +300,7 @@ function ChatScreen({ navigation, route }: any) {
   };
 
   const setupEventStream = () => {
-    const eventSource = client.createEventStream((event) => {
+    const eventSource = client.createEventStream((event: any) => {
       console.log('Received event:', event);
       // Handle real-time events from server
       if (event.type === 'message') {
@@ -324,10 +319,10 @@ function ChatScreen({ navigation, route }: any) {
     
     try {
       const serverMessages = await client.getSessionMessages(currentSession);
-      const localMessages: LocalMessage[] = serverMessages.map(msg => ({
+      const localMessages: LocalMessage[] = serverMessages.map((msg: any) => ({
         id: msg.info.id,
         role: msg.info.role,
-        content: msg.parts.filter(p => p.type === 'text').map(p => (p as any).text).join('\n'),
+        content: msg.parts.filter((p: any) => p.type === 'text').map((p: any) => (p as any).text).join('\n'),
         timestamp: msg.info.time.created,
       }));
       setMessages(localMessages);

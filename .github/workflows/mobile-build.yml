@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-android:
+  test-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -27,8 +27,38 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: packages/mobile/package.json
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: packages/mobile
+        run: bun install
+
+      - name: Type check
+        working-directory: packages/mobile
+        run: bun run typecheck
+
+      - name: Verify Expo configuration
+        working-directory: packages/mobile
+        run: |
+          bunx expo config --type prebuild --json > config.json
+          echo "Expo config generated successfully"
+
+  build-android:
+    runs-on: ubuntu-latest
+    needs: test-build
+    if: github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/main' && github.event_name == 'push')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -52,9 +82,24 @@ jobs:
         working-directory: packages/mobile
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            eas build --platform android --profile production --non-interactive
+            eas build --platform android --profile production --non-interactive --wait
           else
-            eas build --platform android --profile preview --non-interactive
+            eas build --platform android --profile preview --non-interactive --wait
+          fi
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Download APK
+        working-directory: packages/mobile
+        run: |
+          # Get the latest build URL and download it
+          BUILD_URL=$(eas build:list --platform android --limit 1 --json | jq -r '.[0].artifacts.buildUrl')
+          if [ "$BUILD_URL" != "null" ] && [ "$BUILD_URL" != "" ]; then
+            mkdir -p build
+            curl -o build/opencode-mobile.apk "$BUILD_URL"
+          else
+            echo "No build URL found"
+            exit 1
           fi
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -63,11 +108,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: opencode-mobile-android
-          path: packages/mobile/build/
+          path: packages/mobile/build/opencode-mobile.apk
           retention-days: 30
 
   build-ios:
     runs-on: macos-latest
+    needs: test-build
+    if: github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/main' && github.event_name == 'push')
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -76,8 +123,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: packages/mobile/package.json
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -101,9 +146,24 @@ jobs:
         working-directory: packages/mobile
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            eas build --platform ios --profile production --non-interactive
+            eas build --platform ios --profile production --non-interactive --wait
           else
-            eas build --platform ios --profile preview --non-interactive
+            eas build --platform ios --profile preview --non-interactive --wait
+          fi
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Download IPA
+        working-directory: packages/mobile
+        run: |
+          # Get the latest build URL and download it
+          BUILD_URL=$(eas build:list --platform ios --limit 1 --json | jq -r '.[0].artifacts.buildUrl')
+          if [ "$BUILD_URL" != "null" ] && [ "$BUILD_URL" != "" ]; then
+            mkdir -p build
+            curl -o build/opencode-mobile.ipa "$BUILD_URL"
+          else
+            echo "No build URL found"
+            exit 1
           fi
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -112,7 +172,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: opencode-mobile-ios
-          path: packages/mobile/build/
+          path: packages/mobile/build/opencode-mobile.ipa
           retention-days: 30
 
   release:
@@ -143,13 +203,10 @@ jobs:
         run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        uses: actions/create-release@v1
-        id: create_release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: mobile-v${{ steps.package-version.outputs.version }}
-          release_name: OpenCode Mobile v${{ steps.package-version.outputs.version }}
+          name: OpenCode Mobile v${{ steps.package-version.outputs.version }}
           body: |
             ## OpenCode Mobile App Release
             
@@ -171,23 +228,6 @@ jobs:
             4. Start coding with AI assistance!
           draft: false
           prerelease: false
-
-      - name: Upload Android APK to Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/android/opencode-mobile.apk
-          asset_name: opencode-mobile-android-v${{ steps.package-version.outputs.version }}.apk
-          asset_content_type: application/vnd.android.package-archive
-
-      - name: Upload iOS IPA to Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/ios/opencode-mobile.ipa
-          asset_name: opencode-mobile-ios-v${{ steps.package-version.outputs.version }}.ipa
-          asset_content_type: application/octet-stream
+          files: |
+            ./artifacts/android/opencode-mobile.apk
+            ./artifacts/ios/opencode-mobile.ipa

@@ -114,7 +114,7 @@ export class OpenCodeClient {
     };
 
     if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
+      headers['Authorization'] = `Bearer ${this.token}`;
     }
 
     const response = await fetch(url, {
