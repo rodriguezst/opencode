@@ -20,6 +20,7 @@
 
 ### Installation
 
+#### Desktop/Server
 ```bash
 # YOLO
 curl -fsSL https://opencode.ai/install | bash
@@ -29,6 +30,13 @@ npm i -g opencode-ai@latest        # or bun/pnpm/yarn
 brew install sst/tap/opencode      # macOS
 paru -S opencode-bin               # Arch Linux
 ```
+
+#### Mobile Apps
+Download the mobile apps from the [releases page](https://github.com/sst/opencode/releases):
+- **Android**: Download the APK file for Android devices
+- **iOS**: Download the IPA file for iOS devices (requires TestFlight or sideloading)
+
+The mobile apps connect to your OpenCode server and provide the same AI coding assistance on mobile devices.
 
 > [!TIP]
 > Remove versions older than 0.1.x before installing.
@@ -85,6 +93,22 @@ It's very similar to Claude Code in terms of capability. Here are the key differ
 - Not coupled to any provider. Although Anthropic is recommended, opencode can be used with OpenAI, Google or even local models. As models evolve the gaps between them will close and pricing will drop so being provider agnostic is important.
 - A focus on TUI. opencode is built by neovim users and the creators of [terminal.shop](https://terminal.shop); we are going to push the limits of what's possible in the terminal.
 - A client/server architecture. This for example can allow opencode to run on your computer, while you can drive it remotely from a mobile app. Meaning that the TUI frontend is just one of the possible clients.
+
+### Client-Server Architecture
+
+opencode uses a decoupled client-server architecture:
+
+- **Server**: The main opencode server handles AI provider communication, file system access, and session management
+- **Clients**: Multiple client types can connect to the same server:
+  - **TUI Client**: Terminal-based interface (Go application)
+  - **Mobile Apps**: iOS and Android applications for on-the-go coding assistance
+  - **Web Client**: Browser-based interface (future)
+
+This architecture enables:
+- **Remote access**: Use opencode from any device
+- **Multiple interfaces**: Choose the client that fits your workflow
+- **Centralized state**: All sessions and data managed by the server
+- **Authentication**: Secure access with JWT-based authentication
 
 #### What's the other repo?
 
