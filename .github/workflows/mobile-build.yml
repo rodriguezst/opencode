@@ -1,0 +1,193 @@
+name: Build Mobile Apps
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'packages/mobile/**'
+  pull_request:
+    paths:
+      - 'packages/mobile/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: packages/mobile/package.json
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup EAS CLI
+        run: npm install -g @expo/eas-cli
+
+      - name: Install dependencies
+        working-directory: packages/mobile
+        run: bun install
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build Android APK
+        working-directory: packages/mobile
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            eas build --platform android --profile production --non-interactive
+          else
+            eas build --platform android --profile preview --non-interactive
+          fi
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencode-mobile-android
+          path: packages/mobile/build/
+          retention-days: 30
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: packages/mobile/package.json
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup EAS CLI
+        run: npm install -g @expo/eas-cli
+
+      - name: Install dependencies
+        working-directory: packages/mobile
+        run: bun install
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build iOS IPA
+        working-directory: packages/mobile
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            eas build --platform ios --profile production --non-interactive
+          else
+            eas build --platform ios --profile preview --non-interactive
+          fi
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencode-mobile-ios
+          path: packages/mobile/build/
+          retention-days: 30
+
+  release:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: opencode-mobile-android
+          path: ./artifacts/android/
+
+      - name: Download iOS IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: opencode-mobile-ios
+          path: ./artifacts/ios/
+
+      - name: Get package version
+        id: package-version
+        working-directory: packages/mobile
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: mobile-v${{ steps.package-version.outputs.version }}
+          release_name: OpenCode Mobile v${{ steps.package-version.outputs.version }}
+          body: |
+            ## OpenCode Mobile App Release
+            
+            ### Features
+            - iOS and Android clients for OpenCode server
+            - Server endpoint configuration
+            - JWT-based authentication
+            - Real-time chat with AI coding assistant
+            - Support for all OpenCode modes and providers
+            
+            ### Downloads
+            - **Android**: Download the APK file below
+            - **iOS**: Download the IPA file below (requires TestFlight or sideloading)
+            
+            ### Setup
+            1. Install the app on your device
+            2. Configure your OpenCode server endpoint
+            3. Authenticate with your credentials
+            4. Start coding with AI assistance!
+          draft: false
+          prerelease: false
+
+      - name: Upload Android APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/android/opencode-mobile.apk
+          asset_name: opencode-mobile-android-v${{ steps.package-version.outputs.version }}.apk
+          asset_content_type: application/vnd.android.package-archive
+
+      - name: Upload iOS IPA to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/ios/opencode-mobile.ipa
+          asset_name: opencode-mobile-ios-v${{ steps.package-version.outputs.version }}.ipa
+          asset_content_type: application/octet-stream

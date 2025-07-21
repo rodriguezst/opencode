@@ -17,6 +17,7 @@ import { File } from "../file"
 import { LSP } from "../lsp"
 import { MessageV2 } from "../session/message-v2"
 import { Mode } from "../session/mode"
+import { ServerAuth } from "../auth/server-auth"
 
 const ERRORS = {
   400: {
@@ -45,6 +46,30 @@ export namespace Server {
   function app() {
     const app = new Hono()
 
+    // Authentication middleware
+    const authMiddleware = async (c: any, next: any) => {
+      // Skip auth for public endpoints
+      const publicPaths = ["/doc", "/auth/login", "/auth/register", "/auth/status"]
+      if (publicPaths.includes(c.req.path)) {
+        return next()
+      }
+
+      const authHeader = c.req.header("Authorization")
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return c.json({ error: "Unauthorized" }, 401)
+      }
+
+      const token = authHeader.substring(7)
+      const user = await ServerAuth.validateToken(token)
+      if (!user) {
+        return c.json({ error: "Invalid token" }, 401)
+      }
+
+      // Add user to context
+      c.set("user", user)
+      return next()
+    }
+
     const result = app
       .onError((err, c) => {
         if (err instanceof NamedError) {
@@ -67,6 +92,7 @@ export namespace Server {
           duration: Date.now() - start,
         })
       })
+      .use(authMiddleware)
       .get(
         "/doc",
         openAPISpecs(app, {
@@ -79,6 +105,156 @@ export namespace Server {
             openapi: "3.0.0",
           },
         }),
+      )
+      .post(
+        "/auth/register",
+        describeRoute({
+          description: "Register a new user",
+          responses: {
+            200: {
+              description: "User registered successfully",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      user: z.object({
+                        id: z.string(),
+                        username: z.string(),
+                      }),
+                      token: z.string(),
+                    }),
+                  ),
+                },
+              },
+            },
+            400: {
+              description: "Registration failed",
+              content: {
+                "application/json": {
+                  schema: resolver(z.object({ error: z.string() })),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "json",
+          z.object({
+            username: z.string().min(1),
+            password: z.string().min(6),
+          }),
+        ),
+        async (c) => {
+          try {
+            const { username, password } = c.req.valid("json")
+            const user = await ServerAuth.createUser(username, password)
+            const token = await ServerAuth.createToken(user.id)
+            
+            return c.json({
+              user: {
+                id: user.id,
+                username: user.username,
+              },
+              token: token.token,
+            })
+          } catch (error: any) {
+            return c.json({ error: error.message }, 400)
+          }
+        },
+      )
+      .post(
+        "/auth/login",
+        describeRoute({
+          description: "Login user",
+          responses: {
+            200: {
+              description: "Login successful",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      user: z.object({
+                        id: z.string(),
+                        username: z.string(),
+                      }),
+                      token: z.string(),
+                    }),
+                  ),
+                },
+              },
+            },
+            401: {
+              description: "Invalid credentials",
+              content: {
+                "application/json": {
+                  schema: resolver(z.object({ error: z.string() })),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "json",
+          z.object({
+            username: z.string(),
+            password: z.string(),
+          }),
+        ),
+        async (c) => {
+          const { username, password } = c.req.valid("json")
+          const user = await ServerAuth.authenticateUser(username, password)
+          
+          if (!user) {
+            return c.json({ error: "Invalid credentials" }, 401)
+          }
+          
+          const token = await ServerAuth.createToken(user.id)
+          
+          return c.json({
+            user: {
+              id: user.id,
+              username: user.username,
+            },
+            token: token.token,
+          })
+        },
+      )
+      .get(
+        "/auth/status",
+        describeRoute({
+          description: "Check authentication status",
+          responses: {
+            200: {
+              description: "Authentication status",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      hasUsers: z.boolean(),
+                      defaultCredentials: z.object({
+                        username: z.string(),
+                        password: z.string(),
+                      }).optional(),
+                    }),
+                  ),
+                },
+              },
+            },
+          },
+        }),
+        async (c) => {
+          const hasUsers = await ServerAuth.hasUsers()
+          let defaultCredentials = undefined
+          
+          if (!hasUsers) {
+            defaultCredentials = await ServerAuth.initializeDefaultUser()
+          }
+          
+          return c.json({
+            hasUsers,
+            defaultCredentials,
+          })
+        },
       )
       .get(
         "/event",
