@@ -1,0 +1,312 @@
+---
+title: API
+description: REST API endpoints exposed by the opencode serve command.
+---
+
+When you run `opencode serve`, it starts a headless server that exposes a comprehensive REST API. This allows you to integrate opencode into other applications, automation scripts, or build custom interfaces.
+
+The server provides endpoints for session management, file operations, configuration, and more.
+
+---
+
+## Base URL
+
+By default, the server runs on:
+
+```
+http://127.0.0.1:4096
+```
+
+You can customize the hostname and port using the `--hostname` and `--port` flags:
+
+```bash
+opencode serve --hostname 0.0.0.0 --port 3000
+```
+
+---
+
+## API Documentation
+
+The server provides interactive OpenAPI documentation at:
+
+```
+GET /doc
+```
+
+This endpoint returns the complete OpenAPI specification with all available endpoints, request/response schemas, and example usage.
+
+---
+
+## Core Endpoints
+
+### App Information
+
+#### Get App Info
+```
+GET /app
+```
+Returns information about the current opencode application instance.
+
+#### Initialize App
+```
+POST /app/init
+```
+Initializes the opencode application.
+
+---
+
+### Configuration
+
+#### Get Configuration
+```
+GET /config
+```
+Returns the current opencode configuration.
+
+#### List Providers
+```
+GET /config/providers
+```
+Lists all available AI providers and their models.
+
+---
+
+### Sessions
+
+#### List Sessions
+```
+GET /session
+```
+Returns all available sessions, sorted by most recently updated.
+
+#### Create Session
+```
+POST /session
+```
+Creates a new chat session.
+
+#### Delete Session
+```
+DELETE /session/{id}
+```
+Deletes a session and all its data.
+
+#### Get Session Messages
+```
+GET /session/{id}/message
+```
+Lists all messages in a session.
+
+#### Send Message
+```
+POST /session/{id}/message
+```
+Sends a new message to a session and gets an AI response.
+
+Request body:
+```json
+{
+  "content": "Your message here",
+  "providerID": "provider-name",
+  "modelID": "model-name"
+}
+```
+
+#### Session Management
+- `POST /session/{id}/init` - Initialize session with AGENTS.md analysis
+- `POST /session/{id}/abort` - Abort running session
+- `POST /session/{id}/share` - Share a session
+- `DELETE /session/{id}/share` - Unshare a session
+- `POST /session/{id}/summarize` - Summarize session
+- `POST /session/{id}/revert` - Revert messages
+- `POST /session/{id}/unrevert` - Restore reverted messages
+
+---
+
+### File Operations
+
+#### Read File
+```
+GET /file?path={filepath}
+```
+Reads the content of a file at the specified path.
+
+#### Get File Status
+```
+GET /file/status
+```
+Returns the git status of files in the project.
+
+---
+
+### Search
+
+#### Find Text
+```
+GET /find?pattern={search-pattern}
+```
+Searches for text patterns in files using ripgrep.
+
+#### Find Files
+```
+GET /find/file?query={filename-pattern}
+```
+Finds files matching a pattern.
+
+#### Find Symbols
+```
+GET /find/symbol?query={symbol-name}
+```
+Searches for workspace symbols using the language server.
+
+---
+
+### Modes
+
+#### List Modes
+```
+GET /mode
+```
+Returns all available opencode modes.
+
+---
+
+### Events
+
+#### Subscribe to Events
+```
+GET /event
+```
+Opens a Server-Sent Events (SSE) stream to receive real-time updates about sessions, messages, and other application events.
+
+---
+
+### TUI Control
+
+When opencode is running in TUI mode alongside the server, you can control the TUI programmatically:
+
+- `POST /tui/append-prompt` - Append text to the prompt
+- `POST /tui/submit-prompt` - Submit the current prompt
+- `POST /tui/clear-prompt` - Clear the prompt
+- `POST /tui/open-help` - Open help dialog
+- `POST /tui/open-sessions` - Open sessions dialog
+- `POST /tui/open-themes` - Open themes dialog
+- `POST /tui/open-models` - Open models dialog
+- `POST /tui/execute-command` - Execute TUI commands
+
+---
+
+### Permissions
+
+#### Respond to Permission Request
+```
+POST /session/{id}/permissions/{permissionID}
+```
+Responds to a permission request with approval or denial.
+
+---
+
+### Logging
+
+#### Write Log Entry
+```
+POST /log
+```
+Writes a log entry to the server logs.
+
+Request body:
+```json
+{
+  "service": "your-service-name",
+  "level": "info",
+  "message": "Log message",
+  "extra": {
+    "additional": "metadata"
+  }
+}
+```
+
+---
+
+## Authentication
+
+Currently, the opencode server does not require authentication. It's designed to run locally and be accessed by local applications. If you expose it on a public network, ensure proper network-level security.
+
+---
+
+## Error Handling
+
+All endpoints return errors in a consistent format:
+
+```json
+{
+  "data": {
+    "error": "error-type",
+    "message": "Human readable error message"
+  }
+}
+```
+
+Common HTTP status codes:
+- `200` - Success
+- `400` - Bad request or validation error
+- `500` - Internal server error
+
+---
+
+## Examples
+
+### Creating and Using a Session
+
+1. Create a new session:
+```bash
+curl -X POST http://localhost:4096/session
+```
+
+2. Send a message:
+```bash
+curl -X POST http://localhost:4096/session/{session-id}/message \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "Explain how to use this API",
+    "providerID": "openai",
+    "modelID": "gpt-4"
+  }'
+```
+
+3. Get session messages:
+```bash
+curl http://localhost:4096/session/{session-id}/message
+```
+
+### Searching Files
+
+Search for a text pattern:
+```bash
+curl "http://localhost:4096/find?pattern=function%20main"
+```
+
+Find files by name:
+```bash
+curl "http://localhost:4096/find/file?query=*.ts"
+```
+
+### Reading Files
+
+```bash
+curl "http://localhost:4096/file?path=src/main.ts"
+```
+
+---
+
+## Integration Examples
+
+The REST API makes it easy to integrate opencode into various workflows:
+
+- **CI/CD**: Automate code reviews and analysis
+- **IDEs**: Build custom opencode extensions
+- **Scripts**: Create automation tools for code generation
+- **Web Apps**: Build web interfaces for opencode
+- **Mobile Apps**: Access opencode from mobile applications
+
+For more complex integrations, consider using the Server-Sent Events endpoint to receive real-time updates.
